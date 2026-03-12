@@ -14,4 +14,3 @@ permissions:
 jobs:
   release:
     uses: CheeziCrew/.github/.github/workflows/release-lib.yml@7184d52b3ba66f21297547d2345c9481380cab73
-    secrets: inherit
