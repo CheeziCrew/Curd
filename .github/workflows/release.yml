@@ -1,0 +1,9 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  release:
+    uses: CheeziCrew/.github/.github/workflows/release-lib.yml@7184d524c8bcc91b1e91ff7b3f5d19e117d69b6e
