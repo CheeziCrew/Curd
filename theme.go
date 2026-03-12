@@ -62,6 +62,14 @@ var (
 		Secondary:    ColorYellow,
 		LogoGradient: []color.Color{ColorBrGreen, ColorGreen, ColorBrYellow, ColorYellow},
 	}
+
+	// GruyerePalette — cyan/blue theme.
+	GruyerePalette = Palette{
+		Accent:       ColorCyan,
+		AccentBright: ColorBrCyan,
+		Secondary:    ColorBlue,
+		LogoGradient: []color.Color{ColorBrCyan, ColorCyan, ColorBrBlue, ColorBlue},
+	}
 )
 
 // Styles returns a StyleSet derived from the given palette.
