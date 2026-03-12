@@ -4,6 +4,15 @@
 
 The glue that holds the cheese together. Shared TUI component library for [swissgit](https://github.com/CheeziCrew/swissgit), [raclette](https://github.com/CheeziCrew/raclette), and [fondue](https://github.com/CheeziCrew/fondue).
 
+## Status
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=alert_status)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+[![Reliability Rating](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=reliability_rating)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+[![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=security_rating)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+[![Maintainability Rating](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=sqale_rating)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+[![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=vulnerabilities)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=CheeziCrew_Curd&metric=bugs)](https://sonarcloud.io/summary/overall?id=CheeziCrew_Curd)
+
 ## Components
 
 | Component         | Description                                              |
