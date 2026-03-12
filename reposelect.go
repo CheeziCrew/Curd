@@ -25,6 +25,7 @@ type RepoSelectConfig struct {
 	ParentOffset int    // lines consumed by parent screen
 	TermHeight   int
 	Scanner      ScanFunc
+	SingleSelect bool // enter picks cursor item directly, no toggle/select-all
 }
 
 // RepoSelectModel lets the user pick repos from discovered subdirectories.
@@ -41,6 +42,7 @@ type RepoSelectModel struct {
 	parentOffset int
 	styles       StyleSet
 	scanFunc     ScanFunc
+	singleSelect bool
 }
 
 func measureRepoChrome(_ StyleSet, scrollable bool) int {
@@ -69,6 +71,7 @@ func NewRepoSelectModel(cfg RepoSelectConfig) RepoSelectModel {
 		termHeight:   cfg.TermHeight,
 		styles:       cfg.Palette.Styles(),
 		scanFunc:     cfg.Scanner,
+		singleSelect: cfg.SingleSelect,
 	}
 }
 
@@ -196,34 +199,48 @@ func (m RepoSelectModel) Update(msg tea.Msg) (RepoSelectModel, tea.Cmd) {
 			m.ensureCursorVisible()
 
 		case IsToggle(msg):
-			m.selected[m.cursor] = !m.selected[m.cursor]
+			if !m.singleSelect {
+				m.selected[m.cursor] = !m.selected[m.cursor]
+			}
 
 		case IsSelectAll(msg):
-			allSelected := true
-			for i := range m.repos {
-				if !m.selected[i] {
-					allSelected = false
-					break
-				}
-			}
-			if allSelected {
-				m.selected = make(map[int]bool)
-			} else {
+			if !m.singleSelect {
+				allSelected := true
 				for i := range m.repos {
-					m.selected[i] = true
+					if !m.selected[i] {
+						allSelected = false
+						break
+					}
+				}
+				if allSelected {
+					m.selected = make(map[int]bool)
+				} else {
+					for i := range m.repos {
+						m.selected[i] = true
+					}
 				}
 			}
 
 		case IsEnter(msg):
-			var paths []string
-			for i, r := range m.repos {
-				if m.selected[i] {
-					paths = append(paths, r.Path)
-				}
-			}
 			caller := m.caller
-			return m, func() tea.Msg {
-				return RepoSelectDoneMsg{Paths: paths, Caller: caller}
+			if m.singleSelect {
+				// Pick the item under cursor directly.
+				if m.cursor < len(m.repos) {
+					path := m.repos[m.cursor].Path
+					return m, func() tea.Msg {
+						return RepoSelectDoneMsg{Paths: []string{path}, Caller: caller}
+					}
+				}
+			} else {
+				var paths []string
+				for i, r := range m.repos {
+					if m.selected[i] {
+						paths = append(paths, r.Path)
+					}
+				}
+				return m, func() tea.Msg {
+					return RepoSelectDoneMsg{Paths: paths, Caller: caller}
+				}
 			}
 
 		case IsBack(msg):
@@ -258,15 +275,20 @@ func (m RepoSelectModel) View() string {
 	}
 
 	var s string
-	selCount := 0
-	for i := range m.repos {
-		if m.selected[i] {
-			selCount++
-		}
-	}
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(st.Title.GetForeground())
-	counter := st.Dim.Render(fmt.Sprintf("%d/%d selected", selCount, len(m.repos)))
-	s += titleStyle.Render("Select Repos") + "  " + counter + "\n\n"
+	if m.singleSelect {
+		counter := st.Dim.Render(fmt.Sprintf("%d repos", len(m.repos)))
+		s += titleStyle.Render("Select Repo") + "  " + counter + "\n\n"
+	} else {
+		selCount := 0
+		for i := range m.repos {
+			if m.selected[i] {
+				selCount++
+			}
+		}
+		counter := st.Dim.Render(fmt.Sprintf("%d/%d selected", selCount, len(m.repos)))
+		s += titleStyle.Render("Select Repos") + "  " + counter + "\n\n"
+	}
 
 	if visibleStart > 0 {
 		s += st.Help.Render(fmt.Sprintf("  ↑ %d more above", visibleStart)) + "\n"
@@ -279,9 +301,19 @@ func (m RepoSelectModel) View() string {
 		isCursor := i == m.cursor
 		isSelected := m.selected[i]
 
-		check := st.UncheckStyle.Render("○")
-		if isSelected {
-			check = st.CheckStyle.Render("●")
+		var prefix string
+		if m.singleSelect {
+			if isCursor {
+				prefix = st.CursorMark.Render("▸")
+			} else {
+				prefix = " "
+			}
+		} else {
+			if isSelected {
+				prefix = st.CheckStyle.Render("●")
+			} else {
+				prefix = st.UncheckStyle.Render("○")
+			}
 		}
 
 		name := st.RepoUnselectedName.Render(r.Name)
@@ -304,7 +336,7 @@ func (m RepoSelectModel) View() string {
 			branchInfo = st.BranchMark.Render(fmt.Sprintf(" (%s)", r.Branch))
 		}
 
-		line := fmt.Sprintf("%s  %s%s%s", check, name, info, branchInfo)
+		line := fmt.Sprintf("%s  %s%s%s", prefix, name, info, branchInfo)
 		if isCursor {
 			s += st.RepoActiveItem.Render(line) + "\n"
 		} else {
@@ -319,12 +351,19 @@ func (m RepoSelectModel) View() string {
 		s += "\n"
 	}
 
-	s += RenderHintBar(st, []Hint{
-		{Key: "space", Desc: "toggle"},
-		{Key: "ctrl+a", Desc: "all"},
-		{Key: "enter", Desc: "confirm"},
-		{Key: "esc", Desc: "back"},
-	})
+	if m.singleSelect {
+		s += RenderHintBar(st, []Hint{
+			{Key: "enter", Desc: "select"},
+			{Key: "esc", Desc: "back"},
+		})
+	} else {
+		s += RenderHintBar(st, []Hint{
+			{Key: "space", Desc: "toggle"},
+			{Key: "ctrl+a", Desc: "all"},
+			{Key: "enter", Desc: "confirm"},
+			{Key: "esc", Desc: "back"},
+		})
+	}
 
 	return s
 }
