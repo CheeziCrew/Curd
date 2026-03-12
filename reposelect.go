@@ -139,112 +139,128 @@ func (m RepoSelectModel) Update(msg tea.Msg) (RepoSelectModel, tea.Cmd) {
 		}
 
 	case reposScanResultMsg:
-		m.loading = false
-		m.repos = msg.repos
-		for i, r := range m.repos {
-			if r.IsDirty {
-				m.selected[i] = true
-			}
-		}
-		return m, nil
+		return m.handleScanResult(msg), nil
 
 	case tea.MouseWheelMsg:
-		if !m.loading && len(m.repos) > 0 {
-			mouse := msg.Mouse()
-			if mouse.Button == tea.MouseWheelUp {
-				m.cursor--
-				if m.cursor < 0 {
-					m.cursor = len(m.repos) - 1
-					wh := m.visibleRepoCount()
-					m.winOffset = len(m.repos) - wh
-					if m.winOffset < 0 {
-						m.winOffset = 0
-					}
-				}
-				m.ensureCursorVisible()
-			} else if mouse.Button == tea.MouseWheelDown {
-				m.cursor++
-				if m.cursor >= len(m.repos) {
-					m.cursor = 0
-					m.winOffset = 0
-				}
-				m.ensureCursorVisible()
-			}
-		}
+		m.handleMouseWheel(msg)
 
 	case tea.KeyPressMsg:
-		if m.loading {
-			return m, nil
+		return m.handleKeyPress(msg)
+	}
+	return m, nil
+}
+
+func (m *RepoSelectModel) handleScanResult(msg reposScanResultMsg) RepoSelectModel {
+	m.loading = false
+	m.repos = msg.repos
+	for i, r := range m.repos {
+		if r.IsDirty {
+			m.selected[i] = true
 		}
+	}
+	return *m
+}
 
-		switch {
-		case IsUp(msg):
-			m.cursor--
-			if m.cursor < 0 {
-				m.cursor = len(m.repos) - 1
-				wh := m.visibleRepoCount()
-				m.winOffset = len(m.repos) - wh
-				if m.winOffset < 0 {
-					m.winOffset = 0
-				}
+func (m *RepoSelectModel) handleMouseWheel(msg tea.MouseWheelMsg) {
+	if m.loading || len(m.repos) == 0 {
+		return
+	}
+	mouse := msg.Mouse()
+	if mouse.Button == tea.MouseWheelUp {
+		m.moveCursorUp()
+	} else if mouse.Button == tea.MouseWheelDown {
+		m.moveCursorDown()
+	}
+}
+
+func (m *RepoSelectModel) moveCursorUp() {
+	m.cursor--
+	if m.cursor < 0 {
+		m.cursor = len(m.repos) - 1
+		wh := m.visibleRepoCount()
+		m.winOffset = len(m.repos) - wh
+		if m.winOffset < 0 {
+			m.winOffset = 0
+		}
+	}
+	m.ensureCursorVisible()
+}
+
+func (m *RepoSelectModel) moveCursorDown() {
+	m.cursor++
+	if m.cursor >= len(m.repos) {
+		m.cursor = 0
+		m.winOffset = 0
+	}
+	m.ensureCursorVisible()
+}
+
+func (m RepoSelectModel) handleKeyPress(msg tea.KeyPressMsg) (RepoSelectModel, tea.Cmd) {
+	if m.loading {
+		return m, nil
+	}
+
+	switch {
+	case IsUp(msg):
+		m.moveCursorUp()
+	case IsDown(msg):
+		m.moveCursorDown()
+	case IsToggle(msg):
+		m.handleToggle()
+	case IsSelectAll(msg):
+		m.handleSelectAll()
+	case IsEnter(msg):
+		return m.handleEnter()
+	case IsBack(msg):
+		return m, func() tea.Msg { return BackToMenuMsg{} }
+	}
+	return m, nil
+}
+
+func (m *RepoSelectModel) handleToggle() {
+	if !m.singleSelect {
+		m.selected[m.cursor] = !m.selected[m.cursor]
+	}
+}
+
+func (m *RepoSelectModel) handleSelectAll() {
+	if m.singleSelect {
+		return
+	}
+	allSelected := true
+	for i := range m.repos {
+		if !m.selected[i] {
+			allSelected = false
+			break
+		}
+	}
+	if allSelected {
+		m.selected = make(map[int]bool)
+	} else {
+		for i := range m.repos {
+			m.selected[i] = true
+		}
+	}
+}
+
+func (m RepoSelectModel) handleEnter() (RepoSelectModel, tea.Cmd) {
+	caller := m.caller
+	if m.singleSelect {
+		if m.cursor < len(m.repos) {
+			path := m.repos[m.cursor].Path
+			return m, func() tea.Msg {
+				return RepoSelectDoneMsg{Paths: []string{path}, Caller: caller}
 			}
-			m.ensureCursorVisible()
-
-		case IsDown(msg):
-			m.cursor++
-			if m.cursor >= len(m.repos) {
-				m.cursor = 0
-				m.winOffset = 0
+		}
+	} else {
+		var paths []string
+		for i, r := range m.repos {
+			if m.selected[i] {
+				paths = append(paths, r.Path)
 			}
-			m.ensureCursorVisible()
-
-		case IsToggle(msg):
-			if !m.singleSelect {
-				m.selected[m.cursor] = !m.selected[m.cursor]
-			}
-
-		case IsSelectAll(msg):
-			if !m.singleSelect {
-				allSelected := true
-				for i := range m.repos {
-					if !m.selected[i] {
-						allSelected = false
-						break
-					}
-				}
-				if allSelected {
-					m.selected = make(map[int]bool)
-				} else {
-					for i := range m.repos {
-						m.selected[i] = true
-					}
-				}
-			}
-
-		case IsEnter(msg):
-			caller := m.caller
-			if m.singleSelect {
-				// Pick the item under cursor directly.
-				if m.cursor < len(m.repos) {
-					path := m.repos[m.cursor].Path
-					return m, func() tea.Msg {
-						return RepoSelectDoneMsg{Paths: []string{path}, Caller: caller}
-					}
-				}
-			} else {
-				var paths []string
-				for i, r := range m.repos {
-					if m.selected[i] {
-						paths = append(paths, r.Path)
-					}
-				}
-				return m, func() tea.Msg {
-					return RepoSelectDoneMsg{Paths: paths, Caller: caller}
-				}
-			}
-
-		case IsBack(msg):
-			return m, func() tea.Msg { return BackToMenuMsg{} }
+		}
+		return m, func() tea.Msg {
+			return RepoSelectDoneMsg{Paths: paths, Caller: caller}
 		}
 	}
 	return m, nil
@@ -275,95 +291,129 @@ func (m RepoSelectModel) View() string {
 	}
 
 	var s string
+	s += m.viewHeader(st)
+	s += m.viewScrollUp(st, visibleStart, scrollable)
+	s += m.viewRepoList(st, visibleStart, visibleEnd)
+	s += m.viewScrollDown(st, visibleEnd, scrollable)
+	s += m.viewHintBar(st)
+
+	return s
+}
+
+func (m RepoSelectModel) viewHeader(st StyleSet) string {
 	titleStyle := lipgloss.NewStyle().Bold(true).Foreground(st.Title.GetForeground())
 	if m.singleSelect {
 		counter := st.Dim.Render(fmt.Sprintf("%d repos", len(m.repos)))
-		s += titleStyle.Render("Select Repo") + "  " + counter + "\n\n"
-	} else {
-		selCount := 0
-		for i := range m.repos {
-			if m.selected[i] {
-				selCount++
-			}
-		}
-		counter := st.Dim.Render(fmt.Sprintf("%d/%d selected", selCount, len(m.repos)))
-		s += titleStyle.Render("Select Repos") + "  " + counter + "\n\n"
+		return titleStyle.Render("Select Repo") + "  " + counter + "\n\n"
 	}
+	selCount := 0
+	for i := range m.repos {
+		if m.selected[i] {
+			selCount++
+		}
+	}
+	counter := st.Dim.Render(fmt.Sprintf("%d/%d selected", selCount, len(m.repos)))
+	return titleStyle.Render("Select Repos") + "  " + counter + "\n\n"
+}
 
+func (m RepoSelectModel) viewScrollUp(st StyleSet, visibleStart int, scrollable bool) string {
 	if visibleStart > 0 {
-		s += st.Help.Render(fmt.Sprintf("  ↑ %d more above", visibleStart)) + "\n"
-	} else if scrollable {
-		s += "\n"
+		return st.Help.Render(fmt.Sprintf("  ↑ %d more above", visibleStart)) + "\n"
 	}
+	if scrollable {
+		return "\n"
+	}
+	return ""
+}
 
+func (m RepoSelectModel) viewRepoList(st StyleSet, visibleStart, visibleEnd int) string {
+	var s string
 	for i := visibleStart; i < visibleEnd; i++ {
-		r := m.repos[i]
-		isCursor := i == m.cursor
-		isSelected := m.selected[i]
-
-		var prefix string
-		if m.singleSelect {
-			if isCursor {
-				prefix = st.CursorMark.Render("▸")
-			} else {
-				prefix = " "
-			}
-		} else {
-			if isSelected {
-				prefix = st.CheckStyle.Render("●")
-			} else {
-				prefix = st.UncheckStyle.Render("○")
-			}
-		}
-
-		name := st.RepoUnselectedName.Render(r.Name)
-		if isCursor {
-			name = st.RepoCursorName.Render(r.Name)
-		} else if isSelected {
-			name = st.RepoSelectedName.Render(r.Name)
-		}
-
-		var info string
-		totalChanges := r.Modified + r.Added + r.Deleted + r.Untracked
-		if totalChanges > 0 {
-			info = st.DirtyStyle.Render(fmt.Sprintf(" %dΔ", totalChanges))
-		} else if isSelected || isCursor {
-			info = st.CleanMark.Render(" ✓")
-		}
-
-		branchInfo := ""
-		if r.Branch != "" && r.Branch != r.DefaultBranch {
-			branchInfo = st.BranchMark.Render(fmt.Sprintf(" (%s)", r.Branch))
-		}
-
-		line := fmt.Sprintf("%s  %s%s%s", prefix, name, info, branchInfo)
-		if isCursor {
-			s += st.RepoActiveItem.Render(line) + "\n"
-		} else {
-			s += st.RepoInactiveItem.Render(line) + "\n"
-		}
+		s += m.viewRepoLine(st, i) + "\n"
 	}
+	return s
+}
 
+func (m RepoSelectModel) viewRepoLine(st StyleSet, i int) string {
+	r := m.repos[i]
+	isCursor := i == m.cursor
+	isSelected := m.selected[i]
+
+	prefix := m.repoPrefix(st, isCursor, isSelected)
+	name := m.repoName(st, r.Name, isCursor, isSelected)
+	info := m.repoInfo(st, r, isCursor, isSelected)
+	branchInfo := m.repoBranch(st, r)
+
+	line := fmt.Sprintf("%s  %s%s%s", prefix, name, info, branchInfo)
+	if isCursor {
+		return st.RepoActiveItem.Render(line)
+	}
+	return st.RepoInactiveItem.Render(line)
+}
+
+func (m RepoSelectModel) repoPrefix(st StyleSet, isCursor, isSelected bool) string {
+	if m.singleSelect {
+		if isCursor {
+			return st.CursorMark.Render("▸")
+		}
+		return " "
+	}
+	if isSelected {
+		return st.CheckStyle.Render("●")
+	}
+	return st.UncheckStyle.Render("○")
+}
+
+func (m RepoSelectModel) repoName(st StyleSet, name string, isCursor, isSelected bool) string {
+	if isCursor {
+		return st.RepoCursorName.Render(name)
+	}
+	if isSelected {
+		return st.RepoSelectedName.Render(name)
+	}
+	return st.RepoUnselectedName.Render(name)
+}
+
+func (m RepoSelectModel) repoInfo(st StyleSet, r RepoInfo, isCursor, isSelected bool) string {
+	totalChanges := r.Modified + r.Added + r.Deleted + r.Untracked
+	if totalChanges > 0 {
+		return st.DirtyStyle.Render(fmt.Sprintf(" %dΔ", totalChanges))
+	}
+	if isSelected || isCursor {
+		return st.CleanMark.Render(" ✓")
+	}
+	return ""
+}
+
+func (m RepoSelectModel) repoBranch(st StyleSet, r RepoInfo) string {
+	if r.Branch != "" && r.Branch != r.DefaultBranch {
+		return st.BranchMark.Render(fmt.Sprintf(" (%s)", r.Branch))
+	}
+	return ""
+}
+
+func (m RepoSelectModel) viewScrollDown(st StyleSet, visibleEnd int, scrollable bool) string {
 	remaining := len(m.repos) - visibleEnd
 	if remaining > 0 {
-		s += st.Help.Render(fmt.Sprintf("  ↓ %d more below", remaining)) + "\n"
-	} else if scrollable {
-		s += "\n"
+		return st.Help.Render(fmt.Sprintf("  ↓ %d more below", remaining)) + "\n"
 	}
+	if scrollable {
+		return "\n"
+	}
+	return ""
+}
 
+func (m RepoSelectModel) viewHintBar(st StyleSet) string {
 	if m.singleSelect {
-		s += RenderHintBar(st, []Hint{
+		return RenderHintBar(st, []Hint{
 			{Key: "enter", Desc: "select"},
 			{Key: "esc", Desc: "back"},
 		})
-	} else {
-		s += RenderHintBar(st, []Hint{
-			{Key: "space", Desc: "toggle"},
-			{Key: "ctrl+a", Desc: "all"},
-			{Key: "enter", Desc: "confirm"},
-			{Key: "esc", Desc: "back"},
-		})
 	}
-
-	return s
+	return RenderHintBar(st, []Hint{
+		{Key: "space", Desc: "toggle"},
+		{Key: "ctrl+a", Desc: "all"},
+		{Key: "enter", Desc: "confirm"},
+		{Key: "esc", Desc: "back"},
+	})
 }

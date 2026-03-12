@@ -61,45 +61,54 @@ func (m MenuModel) Update(msg tea.Msg) (MenuModel, tea.Cmd) {
 		m.height = msg.Height
 
 	case tea.KeyPressMsg:
-		switch {
-		case IsUp(msg):
-			m.cursor--
-			if m.cursor < 0 {
-				m.cursor = len(m.config.Items) - 1
-			}
-			m.targetY = float64(m.cursor)
-		case IsDown(msg):
-			m.cursor++
-			if m.cursor >= len(m.config.Items) {
-				m.cursor = 0
-			}
-			m.targetY = float64(m.cursor)
-		case IsEnter(msg):
-			return m, func() tea.Msg {
-				return MenuSelectionMsg{Command: m.config.Items[m.cursor].Command}
-			}
+		if cmd := m.handleKeyPress(msg); cmd != nil {
+			return m, cmd
 		}
 
 	case tea.MouseWheelMsg:
-		mouse := msg.Mouse()
-		if mouse.Button == tea.MouseWheelUp {
-			m.cursor--
-			if m.cursor < 0 {
-				m.cursor = len(m.config.Items) - 1
-			}
-		} else if mouse.Button == tea.MouseWheelDown {
-			m.cursor++
-			if m.cursor >= len(m.config.Items) {
-				m.cursor = 0
-			}
-		}
-		m.targetY = float64(m.cursor)
+		m.handleMouseWheel(msg)
 	}
 
-	// Tick spring animation.
 	m.springY, m.springV = m.spring.Update(m.springY, m.springV, m.targetY)
-
 	return m, nil
+}
+
+func (m *MenuModel) handleKeyPress(msg tea.KeyPressMsg) tea.Cmd {
+	switch {
+	case IsUp(msg):
+		m.cursor--
+		if m.cursor < 0 {
+			m.cursor = len(m.config.Items) - 1
+		}
+		m.targetY = float64(m.cursor)
+	case IsDown(msg):
+		m.cursor++
+		if m.cursor >= len(m.config.Items) {
+			m.cursor = 0
+		}
+		m.targetY = float64(m.cursor)
+	case IsEnter(msg):
+		return func() tea.Msg {
+			return MenuSelectionMsg{Command: m.config.Items[m.cursor].Command}
+		}
+	}
+	return nil
+}
+
+func (m *MenuModel) handleMouseWheel(msg tea.MouseWheelMsg) {
+	mouse := msg.Mouse()
+	if mouse.Button == tea.MouseWheelUp {
+		m.cursor--
+		if m.cursor < 0 {
+			m.cursor = len(m.config.Items) - 1
+		}
+	} else if mouse.Button == tea.MouseWheelDown {
+		m.cursor++
+		if m.cursor >= len(m.config.Items) {
+			m.cursor = 0
+		}
+	}
+	m.targetY = float64(m.cursor)
 }
 
 func (m MenuModel) View() string {

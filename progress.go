@@ -75,14 +75,7 @@ func (m ProgressModel) Init() tea.Cmd {
 func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		w := msg.Width - 20
-		if w > 60 {
-			w = 60
-		}
-		if w < 20 {
-			w = 20
-		}
-		m.bar.SetWidth(w)
+		m.handleResize(msg)
 
 	case spinner.TickMsg:
 		if m.done {
@@ -98,35 +91,56 @@ func (m ProgressModel) Update(msg tea.Msg) (ProgressModel, tea.Cmd) {
 		return m, cmd
 
 	case RepoTaskUpdateMsg:
-		if msg.Index < len(m.Tasks) {
-			m.Tasks[msg.Index].Status = msg.Status
-			m.Tasks[msg.Index].Result = msg.Result
-			m.Tasks[msg.Index].Error = msg.Error
-		}
-
-		m.finished = 0
-		allDone := true
-		for _, t := range m.Tasks {
-			switch t.Status {
-			case TaskDone, TaskFailed:
-				m.finished++
-			default:
-				allDone = false
-			}
-		}
-
-		if allDone {
-			m.done = true
-			return m, tea.Batch(
-				m.bar.SetPercent(1.0),
-				func() tea.Msg { return AllTasksDoneMsg{} },
-			)
-		}
-
-		pct := float64(m.finished) / float64(len(m.Tasks))
-		return m, m.bar.SetPercent(pct)
+		return m.handleTaskUpdate(msg)
 	}
 	return m, nil
+}
+
+func (m *ProgressModel) handleResize(msg tea.WindowSizeMsg) {
+	w := msg.Width - 20
+	if w > 60 {
+		w = 60
+	}
+	if w < 20 {
+		w = 20
+	}
+	m.bar.SetWidth(w)
+}
+
+func (m ProgressModel) handleTaskUpdate(msg RepoTaskUpdateMsg) (ProgressModel, tea.Cmd) {
+	if msg.Index < len(m.Tasks) {
+		m.Tasks[msg.Index].Status = msg.Status
+		m.Tasks[msg.Index].Result = msg.Result
+		m.Tasks[msg.Index].Error = msg.Error
+	}
+
+	var allDone bool
+	m.finished, allDone = m.countFinished()
+
+	if allDone {
+		m.done = true
+		return m, tea.Batch(
+			m.bar.SetPercent(1.0),
+			func() tea.Msg { return AllTasksDoneMsg{} },
+		)
+	}
+
+	pct := float64(m.finished) / float64(len(m.Tasks))
+	return m, m.bar.SetPercent(pct)
+}
+
+func (m ProgressModel) countFinished() (int, bool) {
+	finished := 0
+	allDone := true
+	for _, t := range m.Tasks {
+		switch t.Status {
+		case TaskDone, TaskFailed:
+			finished++
+		default:
+			allDone = false
+		}
+	}
+	return finished, allDone
 }
 
 func (m ProgressModel) View() string {
@@ -137,7 +151,17 @@ func (m ProgressModel) View() string {
 	var s string
 	s += "  " + m.bar.ViewAs(pct) + "\n"
 	s += "  " + st.CountStyle.Render(fmt.Sprintf("%d/%d", m.finished, total))
+	s += m.viewFailCount(st)
+	s += "\n\n"
 
+	if !m.done {
+		s += m.viewRunningTasks(st)
+	}
+
+	return s
+}
+
+func (m ProgressModel) viewFailCount(st StyleSet) string {
 	failed := 0
 	for _, t := range m.Tasks {
 		if t.Status == TaskFailed {
@@ -145,25 +169,25 @@ func (m ProgressModel) View() string {
 		}
 	}
 	if failed > 0 {
-		s += "  " + st.ErrStyle.Render(fmt.Sprintf("(%d failed)", failed))
+		return "  " + st.ErrStyle.Render(fmt.Sprintf("(%d failed)", failed))
 	}
-	s += "\n\n"
+	return ""
+}
 
-	if !m.done {
-		running := 0
-		for _, t := range m.Tasks {
-			if t.Status == TaskRunning {
-				if running < 3 {
-					s += fmt.Sprintf("  %s %s\n", m.spinner.View(), st.NameStyle.Render(t.Name))
-				}
-				running++
+func (m ProgressModel) viewRunningTasks(st StyleSet) string {
+	var s string
+	running := 0
+	for _, t := range m.Tasks {
+		if t.Status == TaskRunning {
+			if running < 3 {
+				s += fmt.Sprintf("  %s %s\n", m.spinner.View(), st.NameStyle.Render(t.Name))
 			}
-		}
-		if running > 3 {
-			s += st.ResultDim.Render(fmt.Sprintf("  … and %d more", running-3)) + "\n"
+			running++
 		}
 	}
-
+	if running > 3 {
+		s += st.ResultDim.Render(fmt.Sprintf("  … and %d more", running-3)) + "\n"
+	}
 	return s
 }
 
