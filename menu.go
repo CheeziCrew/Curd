@@ -28,11 +28,11 @@ type MenuConfig struct {
 
 // MenuModel is the shared main menu component.
 type MenuModel struct {
-	config  MenuConfig
-	styles  StyleSet
-	cursor  int
-	width   int
-	height  int
+	config MenuConfig
+	styles StyleSet
+	cursor int
+	width  int
+	height int
 
 	// Harmonica spring for smooth cursor animation.
 	spring  harmonica.Spring
@@ -44,9 +44,9 @@ type MenuModel struct {
 // NewMenuModel creates a menu from config.
 func NewMenuModel(cfg MenuConfig) MenuModel {
 	return MenuModel{
-		config:  cfg,
-		styles:  cfg.Palette.Styles(),
-		spring:  harmonica.NewSpring(harmonica.FPS(60), 6.0, 0.8),
+		config: cfg,
+		styles: cfg.Palette.Styles(),
+		spring: harmonica.NewSpring(harmonica.FPS(60), 6.0, 0.8),
 	}
 }
 

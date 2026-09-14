@@ -1,28 +1,28 @@
 package curd
 
 import (
-	"image/color"
 	"charm.land/lipgloss/v2"
+	"image/color"
 )
 
 // Base16 ANSI colors — respects terminal theme (works with Tinty, base16 etc).
 var (
-	ColorBg      = lipgloss.Color("0")
-	ColorRed     = lipgloss.Color("1")
-	ColorGreen   = lipgloss.Color("2")
-	ColorYellow  = lipgloss.Color("3")
-	ColorBlue    = lipgloss.Color("4")
-	ColorMagenta = lipgloss.Color("5")
-	ColorCyan    = lipgloss.Color("6")
-	ColorFg      = lipgloss.Color("7")
-	ColorGray    = lipgloss.Color("8")
-	ColorBrRed   = lipgloss.Color("9")
-	ColorBrGreen = lipgloss.Color("10")
+	ColorBg       = lipgloss.Color("0")
+	ColorRed      = lipgloss.Color("1")
+	ColorGreen    = lipgloss.Color("2")
+	ColorYellow   = lipgloss.Color("3")
+	ColorBlue     = lipgloss.Color("4")
+	ColorMagenta  = lipgloss.Color("5")
+	ColorCyan     = lipgloss.Color("6")
+	ColorFg       = lipgloss.Color("7")
+	ColorGray     = lipgloss.Color("8")
+	ColorBrRed    = lipgloss.Color("9")
+	ColorBrGreen  = lipgloss.Color("10")
 	ColorBrYellow = lipgloss.Color("11")
-	ColorBrBlue  = lipgloss.Color("12")
-	ColorBrMag   = lipgloss.Color("13")
-	ColorBrCyan  = lipgloss.Color("14")
-	ColorBrWhite = lipgloss.Color("15")
+	ColorBrBlue   = lipgloss.Color("12")
+	ColorBrMag    = lipgloss.Color("13")
+	ColorBrCyan   = lipgloss.Color("14")
+	ColorBrWhite  = lipgloss.Color("15")
 )
 
 // Palette defines app-specific accent colors that give each tool its identity.
@@ -84,9 +84,9 @@ var (
 // This is the single source of truth for all shared styles.
 func (p Palette) Styles() StyleSet {
 	return StyleSet{
-		Title: lipgloss.NewStyle().Bold(true).Foreground(p.AccentBright).MarginBottom(1),
-		Subtitle: lipgloss.NewStyle().Foreground(p.Accent).Italic(true),
-		Help: lipgloss.NewStyle().Foreground(ColorGray),
+		Title:      lipgloss.NewStyle().Bold(true).Foreground(p.AccentBright).MarginBottom(1),
+		Subtitle:   lipgloss.NewStyle().Foreground(p.Accent).Italic(true),
+		Help:       lipgloss.NewStyle().Foreground(ColorGray),
 		HelpMargin: lipgloss.NewStyle().Foreground(ColorGray).MarginTop(1),
 
 		Selected: lipgloss.NewStyle().Foreground(p.AccentBright).Bold(true),
@@ -110,14 +110,14 @@ func (p Palette) Styles() StyleSet {
 		CheckStyle:   lipgloss.NewStyle().Foreground(p.AccentBright).Bold(true),
 		UncheckStyle: lipgloss.NewStyle().Foreground(ColorGray),
 
-		RepoActiveItem:    lipgloss.NewStyle().Border(lipgloss.ThickBorder(), false, false, false, true).BorderForeground(p.Secondary).PaddingLeft(1),
-		RepoInactiveItem:  lipgloss.NewStyle().PaddingLeft(3),
-		RepoCursorName:    lipgloss.NewStyle().Foreground(p.Secondary).Bold(true),
-		RepoSelectedName:  lipgloss.NewStyle().Foreground(p.Accent).Bold(true),
+		RepoActiveItem:     lipgloss.NewStyle().Border(lipgloss.ThickBorder(), false, false, false, true).BorderForeground(p.Secondary).PaddingLeft(1),
+		RepoInactiveItem:   lipgloss.NewStyle().PaddingLeft(3),
+		RepoCursorName:     lipgloss.NewStyle().Foreground(p.Secondary).Bold(true),
+		RepoSelectedName:   lipgloss.NewStyle().Foreground(p.Accent).Bold(true),
 		RepoUnselectedName: lipgloss.NewStyle().Foreground(ColorGray),
-		DirtyStyle:        lipgloss.NewStyle().Foreground(ColorYellow),
-		CleanMark:         lipgloss.NewStyle().Foreground(ColorGreen),
-		BranchMark:        lipgloss.NewStyle().Foreground(p.Accent),
+		DirtyStyle:         lipgloss.NewStyle().Foreground(ColorYellow),
+		CleanMark:          lipgloss.NewStyle().Foreground(ColorGreen),
+		BranchMark:         lipgloss.NewStyle().Foreground(p.Accent),
 
 		SummaryBox: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(p.AccentBright).Padding(0, 2).Bold(true),
 		SuccessBox: lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(ColorGreen).Padding(0, 1),

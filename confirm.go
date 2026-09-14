@@ -16,16 +16,16 @@ type ConfirmMsg struct {
 
 // ConfirmConfig configures the confirmation dialog.
 type ConfirmConfig struct {
-	Question string  // e.g. "Drop uncommitted changes?"
-	Caller   string  // passed through to ConfirmMsg
+	Question string // e.g. "Drop uncommitted changes?"
+	Caller   string // passed through to ConfirmMsg
 	Palette  Palette
 }
 
 // ConfirmModel is a yes/no confirmation dialog.
 type ConfirmModel struct {
-	config  ConfirmConfig
-	styles  StyleSet
-	cursor  int // 0 = yes, 1 = no
+	config ConfirmConfig
+	styles StyleSet
+	cursor int // 0 = yes, 1 = no
 }
 
 // NewConfirmModel creates a confirmation dialog.

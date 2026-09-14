@@ -37,9 +37,9 @@ func TestConfirmUpdate_Toggle(t *testing.T) {
 
 func TestConfirmUpdate_Enter(t *testing.T) {
 	tests := []struct {
-		name      string
-		cursor    int
-		wantYes   bool
+		name    string
+		cursor  int
+		wantYes bool
 	}{
 		{"enter on Yes", 0, true},
 		{"enter on No", 1, false},
