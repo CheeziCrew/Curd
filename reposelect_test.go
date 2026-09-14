@@ -100,15 +100,22 @@ func TestHandleScanResult(t *testing.T) {
 	if len(result.repos) != 3 {
 		t.Errorf("repos count = %d, want 3", len(result.repos))
 	}
-	// Dirty repos should be pre-selected
+	// Dirty repos sort to the front, preserving their relative order
+	wantOrder := []string{"x", "z", "y"}
+	for i, want := range wantOrder {
+		if result.repos[i].Name != want {
+			t.Errorf("repos[%d].Name = %q, want %q", i, result.repos[i].Name, want)
+		}
+	}
+	// ...and the dirty ones (now indices 0 and 1) are pre-selected
 	if !result.selected[0] {
 		t.Error("dirty repo 0 should be selected")
 	}
-	if result.selected[1] {
-		t.Error("clean repo 1 should not be selected")
+	if !result.selected[1] {
+		t.Error("dirty repo 1 should be selected")
 	}
-	if !result.selected[2] {
-		t.Error("dirty repo 2 should be selected")
+	if result.selected[2] {
+		t.Error("clean repo 2 should not be selected")
 	}
 }
 

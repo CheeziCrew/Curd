@@ -70,6 +70,14 @@ var (
 		Secondary:    ColorBlue,
 		LogoGradient: []color.Color{ColorBrCyan, ColorCyan, ColorBrBlue, ColorBlue},
 	}
+
+	// EmmentalPalette — red/blue theme.
+	EmmentalPalette = Palette{
+		Accent:       ColorRed,
+		AccentBright: ColorBrRed,
+		Secondary:    ColorBlue,
+		LogoGradient: []color.Color{ColorBrRed, ColorRed, ColorBrBlue, ColorBlue},
+	}
 )
 
 // Styles returns a StyleSet derived from the given palette.

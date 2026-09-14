@@ -2,6 +2,7 @@ package curd
 
 import (
 	"fmt"
+	"sort"
 
 	"charm.land/bubbles/v2/spinner"
 	tea "charm.land/bubbletea/v2"
@@ -153,6 +154,9 @@ func (m RepoSelectModel) Update(msg tea.Msg) (RepoSelectModel, tea.Cmd) {
 func (m *RepoSelectModel) handleScanResult(msg reposScanResultMsg) RepoSelectModel {
 	m.loading = false
 	m.repos = msg.repos
+	sort.SliceStable(m.repos, func(i, j int) bool {
+		return m.repos[i].IsDirty && !m.repos[j].IsDirty
+	})
 	for i, r := range m.repos {
 		if r.IsDirty {
 			m.selected[i] = true
