@@ -1,7 +1,9 @@
 package curd
 
 import (
+	"errors"
 	"fmt"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
@@ -887,5 +889,125 @@ func TestViewRepoLine(t *testing.T) {
 	line2 := m.viewRepoLine(st, 1)
 	if line2 == "" {
 		t.Error("viewRepoLine for non-cursor should not be empty")
+	}
+}
+
+// --- ScannerWithWarnings ---
+
+func TestScannerWithWarnings_TakesPrecedenceOverScanner(t *testing.T) {
+	m := NewRepoSelectModel(RepoSelectConfig{
+		Palette:  SwissgitPalette,
+		RootPath: "/root",
+		Scanner: func(string) ([]RepoInfo, error) {
+			return []RepoInfo{{Name: "from-plain-scanner"}}, nil
+		},
+		ScannerWithWarnings: func(string) ([]RepoInfo, []string, error) {
+			return []RepoInfo{{Name: "from-warn-scanner"}}, []string{"skipped: broken"}, nil
+		},
+	})
+	msg := m.scanRepos()()
+	res, ok := msg.(reposScanResultMsg)
+	if !ok {
+		t.Fatalf("expected reposScanResultMsg, got %T", msg)
+	}
+	if len(res.repos) != 1 || res.repos[0].Name != "from-warn-scanner" {
+		t.Errorf("ScannerWithWarnings must win over Scanner, got %+v", res.repos)
+	}
+	if len(res.warnings) != 1 {
+		t.Errorf("expected the warning to survive, got %v", res.warnings)
+	}
+}
+
+func TestPlainScannerStillWorks(t *testing.T) {
+	m := NewRepoSelectModel(RepoSelectConfig{
+		Palette:  SwissgitPalette,
+		RootPath: "/root",
+		Scanner: func(string) ([]RepoInfo, error) {
+			return []RepoInfo{{Name: "alpha"}}, nil
+		},
+	})
+	res, ok := m.scanRepos()().(reposScanResultMsg)
+	if !ok {
+		t.Fatal("expected reposScanResultMsg")
+	}
+	if len(res.repos) != 1 || res.repos[0].Name != "alpha" {
+		t.Errorf("plain Scanner path broke: %+v", res.repos)
+	}
+	if len(res.warnings) != 0 {
+		t.Errorf("plain Scanner has no warnings, got %v", res.warnings)
+	}
+}
+
+// A scan that fails is not an empty root. Rendering "No git repositories
+// found." for a hard failure is how a broken repo stays broken for weeks.
+func TestScanErrorBecomesVisibleWarning(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		cfg  RepoSelectConfig
+	}{
+		{"plain scanner", RepoSelectConfig{
+			Palette:  SwissgitPalette,
+			RootPath: "/root",
+			Scanner:  func(string) ([]RepoInfo, error) { return nil, errors.New("permission denied") },
+		}},
+		{"warning scanner", RepoSelectConfig{
+			Palette:  SwissgitPalette,
+			RootPath: "/root",
+			ScannerWithWarnings: func(string) ([]RepoInfo, []string, error) {
+				return nil, nil, errors.New("permission denied")
+			},
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res, ok := NewRepoSelectModel(tc.cfg).scanRepos()().(reposScanResultMsg)
+			if !ok {
+				t.Fatal("expected reposScanResultMsg")
+			}
+			if len(res.warnings) == 0 {
+				t.Fatal("a scan error must surface as a warning, not an empty list")
+			}
+			if !strings.Contains(res.warnings[0], "permission denied") {
+				t.Errorf("warning should carry the cause, got %q", res.warnings[0])
+			}
+		})
+	}
+}
+
+func TestWarningsRenderInView(t *testing.T) {
+	m := NewRepoSelectModel(RepoSelectConfig{
+		Palette:    SwissgitPalette,
+		RootPath:   "/root",
+		TermHeight: 40,
+		ScannerWithWarnings: func(string) ([]RepoInfo, []string, error) {
+			return []RepoInfo{{Name: "alpha"}}, []string{"broken-repo — dangling extensions.worktreeConfig"}, nil
+		},
+	})
+	res := m.scanRepos()().(reposScanResultMsg)
+	m2 := m.handleScanResult(res)
+
+	view := m2.View()
+	if !strings.Contains(view, "broken-repo") {
+		t.Errorf("the skipped repo must be named in the view:\n%s", view)
+	}
+	if !strings.Contains(view, "skipped") {
+		t.Errorf("the view should say something was skipped:\n%s", view)
+	}
+}
+
+// Warnings must show even when nothing scanned successfully — that is exactly
+// when the user most needs to know why the list is empty.
+func TestWarningsRenderWhenNoReposFound(t *testing.T) {
+	m := NewRepoSelectModel(RepoSelectConfig{
+		Palette:    SwissgitPalette,
+		RootPath:   "/root",
+		TermHeight: 40,
+		ScannerWithWarnings: func(string) ([]RepoInfo, []string, error) {
+			return nil, []string{"only-repo — unreadable"}, nil
+		},
+	})
+	res := m.scanRepos()().(reposScanResultMsg)
+	view := m.handleScanResult(res).View()
+	if !strings.Contains(view, "only-repo") {
+		t.Errorf("empty result must still show why:\n%s", view)
 	}
 }

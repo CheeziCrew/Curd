@@ -13,9 +13,18 @@ import (
 // It runs in a goroutine and returns discovered repos.
 type ScanFunc func(rootPath string) ([]RepoInfo, error)
 
+// ScanFuncWithWarnings is a scanner that can also report what it could not
+// scan — a repo whose .git is unreadable, a path that vanished mid-scan. Those
+// must reach the user: a repo that silently drops out of the list looks like a
+// repo that is fine.
+//
+// When set on RepoSelectConfig it takes precedence over Scanner.
+type ScanFuncWithWarnings func(rootPath string) ([]RepoInfo, []string, error)
+
 // reposScanResultMsg is sent after scanning completes.
 type reposScanResultMsg struct {
-	repos []RepoInfo
+	repos    []RepoInfo
+	warnings []string
 }
 
 // RepoSelectConfig configures the repo selector.
@@ -26,7 +35,10 @@ type RepoSelectConfig struct {
 	ParentOffset int    // lines consumed by parent screen
 	TermHeight   int
 	Scanner      ScanFunc
-	SingleSelect bool // enter picks cursor item directly, no toggle/select-all
+	// ScannerWithWarnings, when set, is used instead of Scanner and can
+	// surface repos it had to skip.
+	ScannerWithWarnings ScanFuncWithWarnings
+	SingleSelect        bool // enter picks cursor item directly, no toggle/select-all
 }
 
 // RepoSelectModel lets the user pick repos from discovered subdirectories.
@@ -43,6 +55,8 @@ type RepoSelectModel struct {
 	parentOffset int
 	styles       StyleSet
 	scanFunc     ScanFunc
+	scanWarnFunc ScanFuncWithWarnings
+	warnings     []string
 	singleSelect bool
 }
 
@@ -72,6 +86,7 @@ func NewRepoSelectModel(cfg RepoSelectConfig) RepoSelectModel {
 		termHeight:   cfg.TermHeight,
 		styles:       cfg.Palette.Styles(),
 		scanFunc:     cfg.Scanner,
+		scanWarnFunc: cfg.ScannerWithWarnings,
 		singleSelect: cfg.SingleSelect,
 	}
 }
@@ -83,13 +98,23 @@ func (m RepoSelectModel) Init() tea.Cmd {
 func (m RepoSelectModel) scanRepos() tea.Cmd {
 	root := m.rootPath
 	scan := m.scanFunc
+	scanWarn := m.scanWarnFunc
 	return func() tea.Msg {
 		if root == "" {
 			root = "."
 		}
+		if scanWarn != nil {
+			repos, warnings, err := scanWarn(root)
+			if err != nil {
+				// A failed scan is not an empty root. Saying "No git
+				// repositories found" here hides the actual problem.
+				return reposScanResultMsg{warnings: append(warnings, "scan failed: "+err.Error())}
+			}
+			return reposScanResultMsg{repos: repos, warnings: warnings}
+		}
 		repos, err := scan(root)
 		if err != nil {
-			return reposScanResultMsg{repos: nil}
+			return reposScanResultMsg{warnings: []string{"scan failed: " + err.Error()}}
 		}
 		return reposScanResultMsg{repos: repos}
 	}
@@ -154,6 +179,7 @@ func (m RepoSelectModel) Update(msg tea.Msg) (RepoSelectModel, tea.Cmd) {
 func (m *RepoSelectModel) handleScanResult(msg reposScanResultMsg) RepoSelectModel {
 	m.loading = false
 	m.repos = msg.repos
+	m.warnings = msg.warnings
 	sort.SliceStable(m.repos, func(i, j int) bool {
 		return m.repos[i].IsDirty && !m.repos[j].IsDirty
 	})
@@ -279,7 +305,7 @@ func (m RepoSelectModel) View() string {
 	}
 
 	if len(m.repos) == 0 {
-		return st.InputBox.Render(st.Dim.Render("No git repositories found."))
+		return m.viewWarnings(st) + st.InputBox.Render(st.Dim.Render("No git repositories found."))
 	}
 
 	wh := m.visibleRepoCount()
@@ -295,6 +321,7 @@ func (m RepoSelectModel) View() string {
 	}
 
 	var s string
+	s += m.viewWarnings(st)
 	s += m.viewHeader(st)
 	s += m.viewScrollUp(st, visibleStart, scrollable)
 	s += m.viewRepoList(st, visibleStart, visibleEnd)
@@ -302,6 +329,20 @@ func (m RepoSelectModel) View() string {
 	s += m.viewHintBar(st)
 
 	return s
+}
+
+// viewWarnings renders what the scan could not read, above the list. Returns
+// "" when there is nothing to say, so callers can prepend it unconditionally.
+func (m RepoSelectModel) viewWarnings(st StyleSet) string {
+	if len(m.warnings) == 0 {
+		return ""
+	}
+	var s string
+	s += st.DirtyStyle.Render(fmt.Sprintf("⚠  %d repo(s) skipped", len(m.warnings))) + "\n"
+	for _, w := range m.warnings {
+		s += st.Dim.Render("   "+w) + "\n"
+	}
+	return s + "\n"
 }
 
 func (m RepoSelectModel) viewHeader(st StyleSet) string {
